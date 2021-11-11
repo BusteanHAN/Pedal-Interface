@@ -30,6 +30,7 @@ PedalInterface::PedalInterface(QWidget *parent)
         }
     }
     rawReadTimer.start(RAW_READ_INTERVAL, this);
+    on_ReadValuesButton_clicked();
 }
 
 PedalInterface::~PedalInterface()
@@ -68,7 +69,6 @@ bool PedalInterface::readSerial(){
             rawReadTimer.start(RAW_READ_INTERVAL, this);
             return true;
         }  catch (const std::exception& e) {
-//            std::cout << e.what() << std::endl;
             rawReadTimer.start(RAW_READ_INTERVAL, this);
             return false;
         }
@@ -77,19 +77,12 @@ bool PedalInterface::readSerial(){
             rawReadTimer.start(RAW_READ_INTERVAL, this);
             return true;
         } else {
-//            try {
-                QStringList messageList = message.split("|");
-                std::cout << messageList.length() << std::endl;
-                if (messageList.length() == 3) {
-                    rawClutch =  messageList.at(0).toInt();
-                    rawGas =  messageList.at(1).toInt();
-                    rawBrake =  messageList.at(2).toDouble();
-                }
-//            }  catch (const std::exception& e) {
-//                std::cout << e.what() << std::endl;
-//                rawReadTimer.start(RAW_READ_INTERVAL, this);
-//                return false;
-//            }
+            QStringList messageList = message.split("|");
+            if (messageList.length() == 3) {
+                rawClutch =  messageList.at(0).toInt();
+                rawGas =  messageList.at(1).toInt();
+                rawBrake =  messageList.at(2).toDouble();
+            }
         }
     }
     rawReadTimer.start(RAW_READ_INTERVAL, this);
@@ -99,19 +92,19 @@ bool PedalInterface::readSerial(){
 void PedalInterface::updateRaw() {
     pedalPort->write("da");
     readSerial();
-    std::cout << rawClutch << " " << rawBrake << " " << rawGas << std::endl;
     ui->ClutchRawReading->setValue(rawClutch);
     ui->BrakeRawReading->setValue(rawBrake);
     ui->GasRawReading->setValue(rawGas);
-//    int temp = map(rawClutch, clutchLimits[0], clutchLimits[1]);
-//    ui->ClutchMap->setValue();
-//    ui->BrakeMap->setValue(map((int)rawBrake, (int)brakeLimits[0], (int)brakeLimits[1], 0, 255));
-//    ui->GasMap->setValue(map(rawGas, gasLimits[0], gasLimits[1], 0, 255));
+    if (!checkLimits()) {
+        ui->ClutchMap->setValue(map(rawClutch, clutchLimits[0], clutchLimits[1]));
+        ui->BrakeMap->setValue(map((int)rawBrake, (int)brakeLimits[0], (int)brakeLimits[1]));
+        ui->GasMap->setValue(map(rawGas, gasLimits[0], gasLimits[1]));
+    }
 }
 
 int PedalInterface::map(int x, int in_min, int in_max)
 {
-  return (x - in_min) * 255 / (in_max - in_min);
+    return (x - in_min) * 255 / (in_max - in_min);
 }
 
 void PedalInterface::updateSettingsUI() {
@@ -131,9 +124,9 @@ void PedalInterface::updateSettingsUI() {
 
 bool PedalInterface::checkLimits() {
     if(clutchLimits[0] == -1 || clutchLimits[1] == -1 ||
-       gasLimits[0] == -1 || gasLimits[1] == -1 ||
-       brakeLimits[0] == -1 || brakeLimits[1] == -1)
-         return true;
+            gasLimits[0] == -1 || gasLimits[1] == -1 ||
+            brakeLimits[0] == -1 || brakeLimits[1] == -1)
+        return true;
     else return false;
 }
 
@@ -147,11 +140,7 @@ void PedalInterface::resetInterfaceLimits() {
 }
 
 void PedalInterface::timerEvent(QTimerEvent *event) {
-    if(event->timerId() == rawReadTimer.timerId()){
-        updateRaw();
-//        ui->label->setText(QString::number(testVar++));
-//        if (testVar == 10) testVar = 0;
-    }
+    if(event->timerId() == rawReadTimer.timerId()) updateRaw();
 }
 
 
@@ -162,17 +151,17 @@ void PedalInterface::on_ReadValuesButton_clicked()
 
     while (checkLimits()) {
         if(clutchLimits[0] == -1){pedalPort->write("dcl");
-        readSerial();}
+            readSerial();}
         if(clutchLimits[1] == -1){pedalPort->write("dch");
-        readSerial();}
+            readSerial();}
         if(brakeLimits[0] == -1){pedalPort->write("dbl");
-        readSerial();}
+            readSerial();}
         if(brakeLimits[1] == -1){pedalPort->write("dbh");
-        readSerial();}
+            readSerial();}
         if(gasLimits[0] == -1){pedalPort->write("dgl");
-        readSerial();}
+            readSerial();}
         if(gasLimits[1] == -1){pedalPort->write("dgh");
-        readSerial();}
+            readSerial();}
     }
     clutchLimitsSetting[1] = clutchLimits[1];
     brakeLimitsSetting[1]  = brakeLimits[1];
