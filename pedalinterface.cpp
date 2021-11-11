@@ -4,6 +4,8 @@
 #include <QThread>
 #include <iostream>
 
+#define RAW_READ_INTERVAL 100
+
 PedalInterface::PedalInterface(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::PedalInterface)
@@ -27,8 +29,7 @@ PedalInterface::PedalInterface(QWidget *parent)
             }
         }
     }
-    pedalPort->write("da0");
-    //    QObject::connect(pedalPort, SIGNAL(readyRead()), this, SLOT(readSerial()));
+    rawReadTimer.start(RAW_READ_INTERVAL, this);
 }
 
 PedalInterface::~PedalInterface()
@@ -38,11 +39,11 @@ PedalInterface::~PedalInterface()
 }
 
 bool PedalInterface::readSerial(){
+    rawReadTimer.stop();
     QString message;
     while(!pedalPort->waitForReadyRead()){}
     message = pedalPort->readAll();
     if (message.startsWith("Lower") || message.startsWith("Upper")) {
-        //        std::cout << message.toStdString() << std::endl;
         QStringList messageList = message.split(" ");
         char level = messageList.at(0).at(0).toLatin1(), selection = messageList.at(1).at(0).toLatin1();
         double value;
@@ -52,48 +53,113 @@ bool PedalInterface::readSerial(){
                 switch (selection) {
                 case 'c':
                     clutchLimits[(level == 'L' ? 0 : 1)] += clutchLimits[(level == 'L' ? 0 : 1)] == -1 ? ((int)value + 1) : 0;
-//                    std::cout << (int)value << std::endl;
-                    //                clutchLimitsSetting[(level == 'L' ? 0 : 1)] = (int)value;
                     break;
                 case 'b':
                     brakeLimits[(level == 'L' ? 0 : 1)] +=  brakeLimits[(level == 'L' ? 0 : 1)] == -1 ? (value + 1) : 0;
-                    //                brakeLimitsSetting[(level == 'L' ? 0 : 1)] = value;
                     break;
                 case 'g':
                     gasLimits[(level == 'L' ? 0 : 1)] += gasLimits[(level == 'L' ? 0 : 1)] == -1 ? ((int)value + 1) : 0;
-                    //                gasLimitsSetting[(level == 'L' ? 0 : 1)] = (int)value;
                     break;
                 default:
                     break;
                 }
             }
-            updateUI();
+            updateSettingsUI();
+            rawReadTimer.start(RAW_READ_INTERVAL, this);
             return true;
         }  catch (const std::exception& e) {
 //            std::cout << e.what() << std::endl;
+            rawReadTimer.start(RAW_READ_INTERVAL, this);
             return false;
         }
     } else {
         if (message.startsWith("Set")) {
-//            std::cout << message.toStdString() << std::endl;
+            rawReadTimer.start(RAW_READ_INTERVAL, this);
             return true;
+        } else {
+//            try {
+                QStringList messageList = message.split("|");
+                std::cout << messageList.length() << std::endl;
+                if (messageList.length() == 3) {
+                    rawClutch =  messageList.at(0).toInt();
+                    rawGas =  messageList.at(1).toInt();
+                    rawBrake =  messageList.at(2).toDouble();
+                }
+//            }  catch (const std::exception& e) {
+//                std::cout << e.what() << std::endl;
+//                rawReadTimer.start(RAW_READ_INTERVAL, this);
+//                return false;
+//            }
         }
+    }
+    rawReadTimer.start(RAW_READ_INTERVAL, this);
+    return false;
+}
+
+void PedalInterface::updateRaw() {
+    pedalPort->write("da");
+    readSerial();
+    std::cout << rawClutch << " " << rawBrake << " " << rawGas << std::endl;
+    ui->ClutchRawReading->setValue(rawClutch);
+    ui->BrakeRawReading->setValue(rawBrake);
+    ui->GasRawReading->setValue(rawGas);
+//    int temp = map(rawClutch, clutchLimits[0], clutchLimits[1]);
+//    ui->ClutchMap->setValue();
+//    ui->BrakeMap->setValue(map((int)rawBrake, (int)brakeLimits[0], (int)brakeLimits[1], 0, 255));
+//    ui->GasMap->setValue(map(rawGas, gasLimits[0], gasLimits[1], 0, 255));
+}
+
+int PedalInterface::map(int x, int in_min, int in_max)
+{
+  return (x - in_min) * 255 / (in_max - in_min);
+}
+
+void PedalInterface::updateSettingsUI() {
+    ui->ClutchLowSpinBox_Read->setValue(clutchLimits[0]);
+    ui->ClutchHighSpinBox_Read->setValue(clutchLimits[1]);
+    ui->BrakeLowSpinBox_Read->setValue(brakeLimits[0]);
+    ui->BrakeHighSpinBox_Read->setValue(brakeLimits[1]);
+    ui->GasLowSpinBox_Read->setValue(gasLimits[0]);
+    ui->GasHighSpinBox_Read->setValue(gasLimits[1]);
+    ui->ClutchLowSpinBox->setValue(clutchLimitsSetting[0]);
+    ui->ClutchHighSpinBox->setValue(clutchLimitsSetting[1]);
+    ui->BrakeLowSpinBox->setValue(brakeLimitsSetting[0]);
+    ui->BrakeHighSpinBox->setValue(brakeLimitsSetting[1]);
+    ui->GasLowSpinBox->setValue(gasLimitsSetting[0]);
+    ui->GasHighSpinBox->setValue(gasLimitsSetting[1]);
+}
+
+bool PedalInterface::checkLimits() {
+    if(clutchLimits[0] == -1 || clutchLimits[1] == -1 ||
+       gasLimits[0] == -1 || gasLimits[1] == -1 ||
+       brakeLimits[0] == -1 || brakeLimits[1] == -1)
+         return true;
+    else return false;
+}
+
+void PedalInterface::resetInterfaceLimits() {
+    clutchLimits[0] = -1;
+    clutchLimits[1] = -1;
+    brakeLimits[0] = -1;
+    brakeLimits[1] = -1;
+    gasLimits[0] = -1;
+    gasLimits[1] = -1;
+}
+
+void PedalInterface::timerEvent(QTimerEvent *event) {
+    if(event->timerId() == rawReadTimer.timerId()){
+        updateRaw();
+//        ui->label->setText(QString::number(testVar++));
+//        if (testVar == 10) testVar = 0;
     }
 }
 
 
-
 void PedalInterface::on_ReadValuesButton_clicked()
 {
-//    std::cout << "/////////////////////////////////" << std::endl;
-//    std::cout << clutchLimitsSetting[0] << " ";// << std::endl;
-//    std::cout << clutchLimitsSetting[1] << std::endl;
-//    std::cout << brakeLimitsSetting[0] << " ";// << std::endl;
-//    std::cout << brakeLimitsSetting[1] << std::endl;
-//    std::cout << gasLimitsSetting[0] << " ";// << std::endl;
-//    std::cout << gasLimitsSetting[1] << std::endl;
-//    std::cout << "/////////////////////////////////" << std::endl;
+    ui->SetValuesButton->setEnabled(true);
     resetInterfaceLimits();
+
     while (checkLimits()) {
         if(clutchLimits[0] == -1){pedalPort->write("dcl");
         readSerial();}
@@ -111,56 +177,16 @@ void PedalInterface::on_ReadValuesButton_clicked()
     clutchLimitsSetting[1] = clutchLimits[1];
     brakeLimitsSetting[1]  = brakeLimits[1];
     gasLimitsSetting[1]    = gasLimits[1];
-    updateUI();
+    updateSettingsUI();
+
     clutchLimitsSetting[0] = clutchLimits[0];
     brakeLimitsSetting[0]  = brakeLimits[0];
     gasLimitsSetting[0]    = gasLimits[0];
-    updateUI();
-//    std::cout << clutchLimitsSetting[0] << " ";// << std::endl;
-//    std::cout << clutchLimitsSetting[1] << std::endl;
-//    std::cout << brakeLimitsSetting[0] << " ";// << std::endl;
-//    std::cout << brakeLimitsSetting[1] << std::endl;
-//    std::cout << gasLimitsSetting[0] << " ";// << std::endl;
-//    std::cout << gasLimitsSetting[1] << std::endl;
-//    std::cout << "/////////////////////////////////" << std::endl;
-}
-
-
-void PedalInterface::updateUI() {
-    ui->ClutchLowSpinBox_Read->setValue(clutchLimits[0]);
-    ui->ClutchHighSpinBox_Read->setValue(clutchLimits[1]);
-    ui->BrakeLowSpinBox_Read->setValue(brakeLimits[0]);
-    ui->BrakeHighSpinBox_Read->setValue(brakeLimits[1]);
-    ui->GasLowSpinBox_Read->setValue(gasLimits[0]);
-    ui->GasHighSpinBox_Read->setValue(gasLimits[1]);
-    ui->ClutchLowSpinBox->setValue(clutchLimitsSetting[0]);
-    ui->ClutchHighSpinBox->setValue(clutchLimitsSetting[1]);
-    ui->BrakeLowSpinBox->setValue(brakeLimitsSetting[0]);
-    ui->BrakeHighSpinBox->setValue(brakeLimitsSetting[1]);
-    ui->GasLowSpinBox->setValue(gasLimitsSetting[0]);
-    ui->GasHighSpinBox->setValue(gasLimitsSetting[1]);
-}
-
-
-bool PedalInterface::checkLimits() {
-    if(clutchLimits[0] == -1 || clutchLimits[1] == -1 ||
-       gasLimits[0] == -1 || gasLimits[1] == -1 ||
-       brakeLimits[0] == -1 || brakeLimits[1] == -1)
-    {
-//        std::cout << "still checking limits" << std::endl;
-        return true;
-    }
-    else return false;
+    updateSettingsUI();
 }
 
 void PedalInterface::on_SetValuesButton_clicked()
 {
-//        std::cout << clutchLimitsSetting[0] << " ";// << std::endl;
-//        std::cout << clutchLimitsSetting[1] << std::endl;
-//        std::cout << brakeLimitsSetting[0] << " ";// << std::endl;
-//        std::cout << brakeLimitsSetting[1] << std::endl;
-//        std::cout << gasLimitsSetting[0] << " ";// << std::endl;
-//        std::cout << gasLimitsSetting[1] << std::endl;
     pedalPort->write(("cl" + std::to_string(clutchLimitsSetting[0])).c_str());
     readSerial();
     pedalPort->write(("ch" + std::to_string(clutchLimitsSetting[1])).c_str());
@@ -174,18 +200,9 @@ void PedalInterface::on_SetValuesButton_clicked()
     pedalPort->write(("gh" + std::to_string(gasLimitsSetting[1])).c_str());
     readSerial();
     on_ReadValuesButton_clicked();
-    updateUI();
+    updateSettingsUI();
 }
 
-
-void PedalInterface::resetInterfaceLimits() {
-    clutchLimits[0] = -1;
-    clutchLimits[1] = -1;
-    brakeLimits[0] = -1;
-    brakeLimits[1] = -1;
-    gasLimits[0] = -1;
-    gasLimits[1] = -1;
-}
 
 void PedalInterface::on_ClutchLowSlider_valueChanged(int value)
 {
@@ -195,31 +212,26 @@ void PedalInterface::on_ClutchLowSlider_valueChanged(int value)
 
 void PedalInterface::on_ClutchHighSlider_valueChanged(int value)
 {
-//    if (ui->ClutchLowSlider->value() > value) ui->ClutchLowSlider->setValue(value);
     clutchLimitsSetting[1] = value;
 }
 
 void PedalInterface::on_BrakeLowSlider_valueChanged(int value)
 {
-//    if (ui->BrakeHighSlider->value() < value) ui->BrakeHighSlider->setValue(value);
     brakeLimitsSetting[0] = value;
 }
 
 void PedalInterface::on_BrakeHighSlider_valueChanged(int value)
 {
-//    if (ui->BrakeLowSlider->value() > value) ui->BrakeLowSlider->setValue(value);
     brakeLimitsSetting[1] = value;
 }
 
 void PedalInterface::on_GasLowSlider_valueChanged(int value)
 {
-//    if (ui->GasHighSlider->value() < value) ui->GasHighSlider->setValue(value);
     gasLimitsSetting[0] = value;
 }
 
 void PedalInterface::on_GasHighSlider_valueChanged(int value)
 {
-//    if (ui->GasLowSlider->value() > value) ui->GasLowSlider->setValue(value);
     gasLimitsSetting[1] = value;
 }
 

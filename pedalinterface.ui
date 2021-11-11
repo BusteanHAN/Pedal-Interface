@@ -165,7 +165,7 @@
      <property name="title">
       <string>Mapped</string>
      </property>
-     <widget class="QSpinBox" name="BrakeRawReading_2">
+     <widget class="QSpinBox" name="BrakeMap">
       <property name="geometry">
        <rect>
         <x>140</x>
@@ -180,11 +180,14 @@
       <property name="buttonSymbols">
        <enum>QAbstractSpinBox::NoButtons</enum>
       </property>
+      <property name="minimum">
+       <number>-1023</number>
+      </property>
       <property name="maximum">
-       <number>8388607</number>
+       <number>1023</number>
       </property>
      </widget>
-     <widget class="QSpinBox" name="ClutchRawReading_2">
+     <widget class="QSpinBox" name="ClutchMap">
       <property name="geometry">
        <rect>
         <x>20</x>
@@ -208,6 +211,9 @@
       <property name="prefix">
        <string/>
       </property>
+      <property name="minimum">
+       <number>-1023</number>
+      </property>
       <property name="maximum">
        <number>1023</number>
       </property>
@@ -215,7 +221,7 @@
        <enum>QAbstractSpinBox::DefaultStepType</enum>
       </property>
      </widget>
-     <widget class="QSpinBox" name="GasRawReading_2">
+     <widget class="QSpinBox" name="GasMap">
       <property name="geometry">
        <rect>
         <x>260</x>
@@ -230,8 +236,11 @@
       <property name="buttonSymbols">
        <enum>QAbstractSpinBox::NoButtons</enum>
       </property>
+      <property name="minimum">
+       <number>-1023</number>
+      </property>
       <property name="maximum">
-       <number>8388607</number>
+       <number>1023</number>
       </property>
      </widget>
     </widget>
@@ -540,6 +549,9 @@
      </widget>
     </widget>
     <widget class="QPushButton" name="SetValuesButton">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="geometry">
       <rect>
        <x>10</x>

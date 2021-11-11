@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QSerialPort>
+#include <QBasicTimer>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class PedalInterface; }
@@ -53,10 +54,23 @@ private:
     int clutchLimitsSetting[2]= {-1,-1}, gasLimitsSetting[2] = {-1,-1};
     double brakeLimits[2] = {-1,-1};
     double brakeLimitsSetting[2] = {-1,-1};
-    QSerialPort *pedalPort;
 
-    void updateUI();
+    int rawClutch = 0, rawBrake = 0, rawGas = 0;
+    int mapClutch = 0, mapBrake = 0, mapGas = 0;
+
+    QSerialPort *pedalPort;
+    QBasicTimer rawReadTimer;
+
+//    int testVar = 0;
+
+    int map(int x, int in_min, int in_max);
+    void updateRaw();
+    void updateSettingsUI();
     bool checkLimits();
     void resetInterfaceLimits();
+
+protected:
+    void timerEvent(QTimerEvent *event) override;
+
 };
 #endif // PEDALINTERFACE_H
