@@ -4,7 +4,7 @@
 #include <QThread>
 #include <iostream>
 
-#define RAW_READ_INTERVAL 100
+#define RAW_READ_INTERVAL 1//00
 
 PedalInterface::PedalInterface(QWidget *parent)
     : QMainWindow(parent)

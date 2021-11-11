@@ -1,5 +1,7 @@
 QT       += core gui widgets serialport
 
+RC_ICONS += icon.ico
+
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++11
